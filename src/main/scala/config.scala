@@ -1,5 +1,7 @@
 package giter8
 
+import giter8.Giter8
+
 object Config {
   import java.io.{ File, FileInputStream, FileOutputStream }
   import java.util.Properties

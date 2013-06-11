@@ -1,8 +1,20 @@
 package giter8
 
 import java.io.File
-import org.apache.commons.io.FileUtils
+import java.io.FileInputStream
+import java.nio.charset.MalformedInputException
+
+import scala.Array.canBuildFrom
+import scala.collection.JavaConversions.enumerationAsScalaIterator
+import scala.collection.immutable.Stream.consWrapper
+import scala.util.control.Exception.allCatch
+import scala.util.control.Exception.catching
+
 import org.apache.commons.io.Charsets.UTF_8
+import org.apache.commons.io.FileUtils
+import org.clapper.scalasti.StringTemplate
+
+import Regex.Param
 
 object G8 {
   import scala.util.control.Exception.allCatch
@@ -79,17 +91,6 @@ object G8 {
 
 object G8Helpers {
   import scala.util.control.Exception.catching
-
-  object Regs {
-    val Param = """^--(\S+)=(.+)$""".r
-    val Repo = """^([^\s/]+)/([^\s/]+?)(?:\.g8)?$""".r
-    val Branch = """^-(b|-branch)$""".r
-    val RemoteTemplates = """^-(l|-list)$""".r
-    val Git = "^(git[@|://].*)$".r
-    val Local = """^file://(\S+)$""".r
-  }
-
-  import Regs._
 
   private def applyT(fetch: File => (Map[String, String], Stream[File], File, Option[File]), isScaffolding: Boolean = false)(tmpl: File, outputFolder: File, arguments: Seq[String] = Nil) = {
     val (defaults, templates, templatesRoot, scaffoldsRoot) = fetch(tmpl)
