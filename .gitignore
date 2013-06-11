@@ -4,3 +4,8 @@ project/build/target/
 target/
 src_managed/
 project/plugins/project/
+.cache
+.classpath
+.project
+project/target
+project/project
