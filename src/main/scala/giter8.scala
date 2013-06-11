@@ -1,15 +1,10 @@
 package giter8
 
-class Giter8 extends xsbti.AppMain with Apply {
-  import dispatch._
+class Giter8 extends Apply {
 
   import G8Helpers.Regs._
 
   java.util.logging.Logger.getLogger("").setLevel(java.util.logging.Level.SEVERE)
-
-  /** The launched conscript entry point */
-  def run(config: xsbti.AppConfiguration): Exit =
-    new Exit(Giter8.run(config.arguments))
 
   /** Runner shared my main-class runner */
   def run(args: Array[String]): Int = {
@@ -88,8 +83,6 @@ class Giter8 extends xsbti.AppMain with Apply {
                 |""".stripMargin format (BuildInfo.version)
 
 }
-
-class Exit(val code: Int) extends xsbti.Exit
 
 object Giter8 extends Giter8 {
   import java.io.File
