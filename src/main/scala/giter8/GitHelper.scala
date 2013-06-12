@@ -5,9 +5,10 @@ import java.io.File
 import scala.collection.JavaConverters._
 import scala.util.Success
 import scala.util.Failure
+import scala.util.Try
 
 object GitHelper {
-  def clone(repo: String, branch: Option[String], directory: File) = {
+  def clone(repo: String, branch: Option[String], directory: File):Try[File] = Try {
 
     val fullBranchName = branch.map("refs/heads/" + _)
 
@@ -19,8 +20,8 @@ object GitHelper {
     git.getRepository.close()
 
     optionalBranchFound match {
-      case Some(true) | None => Success(directory)
-      case Some(false) => Failure(new Exception(s"Branch not found: ${branch.get}"))
+      case Some(true) | None => directory
+      case Some(false) => throw new Exception(s"Branch not found: ${branch.get}")
     }
   }
 
