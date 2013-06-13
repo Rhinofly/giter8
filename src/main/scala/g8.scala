@@ -1,12 +1,9 @@
 package giter8
 
 import java.io.File
-import java.io.FileInputStream
 import java.nio.charset.MalformedInputException
 
 import scala.Array.canBuildFrom
-import scala.collection.JavaConversions.enumerationAsScalaIterator
-import scala.collection.immutable.Stream.consWrapper
 import scala.util.control.Exception.allCatch
 import scala.util.control.Exception.catching
 
@@ -63,6 +60,7 @@ object G8 {
     case '.' => """\."""
     case x => x.toString
   }).r
+
   def expandPath(relative: String, toPath: File, parameters: Map[String, String]): File = {
     val fileParams = Map(parameters.toSeq map {
       case (k, v) if k == "package" => (k, v.replaceAll("""\.""", System.getProperty("file.separator") match {
@@ -91,48 +89,14 @@ object G8 {
 object G8Helpers {
   import scala.util.control.Exception.catching
 
-  private def withParametersAndOutputRoot[T <: Either[_, _]](
-    arguments: Seq[String],
-    defaultProperties: Map[String, String],
-    outputFolder: File,
-    scaffoldsRoot: Option[File])(code: (Map[String, String], File) => T): T = {
+  def getOutputRoot(parameters: Map[String, String], outputFolder: java.io.File): java.io.File = {
 
-    val parameters = getParameters(arguments, defaultProperties)
     val outputPath = parameters
       .get("name")
       .map(StringHelpers.normalize)
       .getOrElse(".")
 
-    val outputRoot = new File(outputFolder, outputPath)
-
-    val r = code(parameters, outputRoot)
-    
-    for (scaffoldsRoot <- scaffoldsRoot if (r.isRight))
-      copyScaffolds(scaffoldsRoot, outputRoot)
-      
-    r
-  }
-
-  private def applyT(templateInfo: TemplateInfo)(outputFolder: File, arguments: Seq[String] = Nil) = {
-
-    val TemplateInfo(defaultProperties, templates, templatesRoot, scaffoldsRoot) = templateInfo
-
-    withParametersAndOutputRoot(arguments, defaultProperties, outputFolder, scaffoldsRoot) {
-      (parameters, outputRoot) =>
-
-        write(templatesRoot, templates, parameters, outputRoot, false)
-    }
-  }
-
-  private def applyTScaffold(templateInfo: TemplateInfo)(outputFolder: File, arguments: Seq[String] = Nil) = {
-
-    val TemplateInfo(defaultProperties, templates, templatesRoot, scaffoldsRoot) = templateInfo
-
-    withParametersAndOutputRoot(arguments, defaultProperties, outputFolder, scaffoldsRoot) {
-      (parameters, outputRoot) =>
-
-        write(templatesRoot, templates, parameters, outputRoot, true)
-    }
+    new File(outputFolder, outputPath)
   }
 
   private def argumentsToProperties(arguments: Seq[String]): Map[String, String] =
@@ -156,7 +120,7 @@ object G8Helpers {
       }
   }
 
-  private def getParameters(arguments: Seq[String], defaultProperties: Map[String, String]): Map[String, String] = {
+  def getParameters(arguments: Seq[String], defaultProperties: Map[String, String]): Map[String, String] = {
     val replacements = argumentsToProperties(arguments)
     val result = ReplacePropertyValues(defaultProperties, replacements)
 
@@ -165,18 +129,6 @@ object G8Helpers {
     }
 
     result.replacedProperties ++ interact(result.unchangedProperties)
-  }
-
-  def applyTemplate(base: File, outputFolder: File, arguments: Seq[String] = Nil) = {
-    val templateInfo =
-      Template.fetchInfo(base, Some("src/main/g8"), Some("src/main/scaffolds"))
-    applyT(templateInfo)(outputFolder, arguments)
-  }
-
-  def applyRaw(base: File, outputFolder: File, arguments: Seq[String] = Nil) = {
-    val templateInfo =
-      Template.fetchInfo(base, None, None)
-    applyTScaffold(templateInfo)(outputFolder, arguments)
   }
 
   def interact(params: Map[String, String]) = {
@@ -215,55 +167,121 @@ object G8Helpers {
 
   private def relativize(in: File, from: File) = from.toURI().relativize(in.toURI).getPath
 
-  def write(tmpl: File,
+  type In = File
+  type Out = File
+
+  def toInputAndOutput(parameters: Map[String, String], templatesRoot: File, outputRoot: File)(template: File): (In, Out) = {
+    val name = relativize(template, templatesRoot)
+    val out = G8.expandPath(name, outputRoot, parameters)
+    template -> out
+  }
+
+  def write(templatesRoot: File,
     templates: Iterable[File],
     parameters: Map[String, String],
-    base: File, isScaffolding: Boolean) = {
+    outputRoot: File) = {
 
-    import java.nio.charset.MalformedInputException
     val renderer = new StringRenderer
 
-    templates.map { in =>
-      val name = relativize(in, tmpl)
-      val out = G8.expandPath(name, base, parameters)
-      (in, out)
-    }.foreach {
-      case (in, out) =>
-        val existingScaffoldingAction = if (out.exists && isScaffolding) {
-          println(out.getCanonicalPath + " already exists")
-          print("do you want to append, override or skip existing file? [O/a/s] ")
-          Console.readLine match {
-            case a if a == "a" => Some(true)
-            case a if a == "o" || a == "" => Some(false)
-            case _ => None
-          }
-        } else None
+    templates
+      .map(toInputAndOutput(parameters, templatesRoot, outputRoot))
+      .foreach {
+        case (in, out) =>
 
-        if (out.exists && existingScaffoldingAction.isDefined == false) {
-          println("Skipping existing file: %s" format out.toString)
-        } else {
+          val text = readUtf8File(in)
+          val verbatim = G8.verbatim(out, parameters)
+
+          val action =
+            if (out.exists) Skip
+            else NoAction
+
           out.getParentFile.mkdirs()
-          if (G8.verbatim(out, parameters))
-            FileUtils.copyFile(in, out)
-          else {
-            catching(classOf[MalformedInputException]).opt {
-              Some(G8.write(out, FileUtils.readFileToString(in, UTF_8), parameters, append = existingScaffoldingAction.getOrElse(false)))
-            }.getOrElse {
-              if (existingScaffoldingAction.getOrElse(false)) {
-                val existing = FileUtils.readFileToString(in, UTF_8)
-                FileUtils.write(out, existing, UTF_8, true)
-              } else {
-                FileUtils.copyFile(in, out)
-              }
-            }
+
+          (action, text, verbatim) match {
+            case (Skip, _, _) =>
+              println("Skipping existing file: %s" format out.toString)
+            case (_, Some(text), false) =>
+              G8.write(out, text, parameters, append = false)
+            case (_, _, _) =>
+              FileUtils.copyFile(in, out)
           }
-          if (in.canExecute) {
+
+          if (action != Skip && in.canExecute) {
             out.setExecutable(true)
           }
-        }
+      }
+
+    Right("Template applied in %s" format (outputRoot.toString))
+  }
+
+  def readUtf8File(file: File) =
+    catching(classOf[MalformedInputException]).opt {
+      FileUtils.readFileToString(file, UTF_8)
     }
 
-    Right("Template applied in %s" format (base.toString))
+  sealed trait Action
+  case object Append extends Action
+  case object Override extends Action
+  case object Skip extends Action
+  case object NoAction extends Action
+
+  private def getAction(fileName: String, isText: Boolean, verbatim: Boolean) = {
+    val utf8 = "UTF8 text"
+    val fileType = if (isText) utf8 else s"non-$utf8"
+    val markedAsVerbatim = if (verbatim) " and is marked as verbatim" else ""
+    println(s"$fileName already exists ($fileType)$markedAsVerbatim")
+
+    val allowAppend = isText && !verbatim
+
+    val append = if (allowAppend) " append," else ""
+    val appendOption = if (allowAppend) "/a" else ""
+    print(s"do you want to$append override or skip existing file? [O$appendOption/s] ")
+
+    Console.readLine match {
+      case "a" if allowAppend => Append
+      case "o" | "" => Override
+      case _ => Skip
+    }
+  }
+
+  def writeInterative(templatesRoot: File,
+    templates: Iterable[File],
+    parameters: Map[String, String],
+    outputRoot: File) = {
+
+    val renderer = new StringRenderer
+
+    templates
+      .map(toInputAndOutput(parameters, templatesRoot, outputRoot))
+      .foreach {
+        case (in, out) =>
+          val text = readUtf8File(in)
+          val verbatim = G8.verbatim(out, parameters)
+
+          val action =
+            if (out.exists) {
+              getAction(out.getCanonicalPath, text.isDefined, verbatim)
+            } else NoAction
+
+          out.getParentFile.mkdirs()
+
+          (action, text, verbatim) match {
+            case (Skip, _, _) =>
+              println("Skipping existing file: %s" format out.toString)
+            case (Append, Some(text), _) =>
+              G8.write(out, text, parameters, append = true)
+            case (_, Some(text), false) =>
+              G8.write(out, text, parameters, append = false)
+            case (_, _, _) =>
+              FileUtils.copyFile(in, out)
+          }
+
+          if (action != Skip && in.canExecute) {
+            out.setExecutable(true)
+          }
+      }
+
+    Right("Template applied in %s" format (outputRoot.toString))
   }
 
   def copyScaffolds(sf: File, output: File) {
@@ -289,12 +307,11 @@ object G8Helpers {
     }
   }
 
-  private def copyScaffolds(scaffoldsRoot: Option[File], outputRoot: File): Any = {
+  def copyScaffolds(scaffoldsRoot: Option[File], outputRoot: File): Any = {
     for (
       root <- scaffoldsRoot
     ) copyScaffolds(root, outputRoot)
   }
-
 }
 
 class StringRenderer extends org.clapper.scalasti.AttributeRenderer[String] {

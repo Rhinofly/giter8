@@ -15,7 +15,7 @@ import Regex.Local
 import Regex.Param
 import Regex.Repo
 
-class Giter8 extends Apply {
+class Giter8 {
 
   private val tempDirectory =
     new File(FileUtils.getTempDirectory, "giter8-" + System.nanoTime)
@@ -55,13 +55,27 @@ class Giter8 extends Apply {
     }
   }
 
-  def performTasks(repo: String, branch: Option[String], params: Seq[String]): Try[String] = {
+  def performTasks(repo: String, branch: Option[String], arguments: Seq[String]): Try[String] = {
 
     val template = GitHelper.clone(repo, branch, tempDirectory)
 
     val result =
       template.map { template =>
-        val Right(appliedTemplate) = G8Helpers.applyTemplate(template, new File("."), params)
+        val templateInfo = Template.fetchInfo(template, Some("src/main/g8"), Some("src/main/scaffolds"))
+        val parameters = G8Helpers.getParameters(arguments, templateInfo.defaultProperties)
+
+        val outputRoot = G8Helpers.getOutputRoot(parameters, outputFolder = new File("."))
+
+        val TemplateInfo(_, templates, templatesRoot, scaffoldsRoot) = templateInfo
+
+        val result = G8Helpers.write(templatesRoot, templates, parameters, outputRoot)
+        // just here during refactoring, making sure we do not remove this method for a lack of usage
+        val result2 = G8Helpers.writeInterative(templatesRoot, templates, parameters, outputRoot)
+
+        if (result.isRight) G8Helpers.copyScaffolds(scaffoldsRoot, outputRoot)
+
+        val Right(appliedTemplate) = result
+
         appliedTemplate
       }
 
