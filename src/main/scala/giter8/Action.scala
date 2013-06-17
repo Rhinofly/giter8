@@ -2,6 +2,7 @@ package giter8
 
 import java.io.File
 import org.apache.commons.io.FileUtils
+import org.apache.commons.io.Charsets.UTF_8
 
 sealed trait Action {
   def execute(): Unit
@@ -13,8 +14,10 @@ trait RenderAction extends Action {
   val parameters: Map[String, String]
   val append: Boolean
 
-  def execute(): Unit =
-    G8.write(out, text, parameters, append)
+  def execute(): Unit = {
+    val applied = StringRenderer.render(text, parameters)
+    FileUtils.writeStringToFile(out, applied, UTF_8, append)
+  }
 }
 
 case class RenderAndAppend(

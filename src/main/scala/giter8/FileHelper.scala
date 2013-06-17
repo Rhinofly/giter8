@@ -1,6 +1,7 @@
 package giter8
 
 import java.io.File
+import org.clapper.scalasti.StringTemplate
 
 object FileHelper {
   private def getFilesRecursively(filter: File => Boolean)(f: File): Stream[File] =
@@ -16,4 +17,8 @@ object FileHelper {
 
   def getAllFilesRecursively = getFilesRecursively(_ => true) _
   def getVisibleFilesRecursively = getFilesRecursively(!_.isHidden) _
+  
+  def relativize(in: File, from: File) = 
+    (from.toURI relativize in.toURI).getPath
+  
 }

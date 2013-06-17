@@ -1,6 +1,6 @@
 package giter8
 
-object Regex {
+object Regexes {
   val Param = """^--(\S+)=(.+)$""".r
   val Repo = """^([^\s/]+)/([^\s/]+?)(?:\.g8)?$""".r
   val Branch = """^-(b|-branch)$""".r

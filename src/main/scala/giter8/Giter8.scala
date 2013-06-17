@@ -9,11 +9,11 @@ import scala.util.Try
 import org.apache.commons.io.FileUtils
 import org.eclipse.jgit.api.errors.JGitInternalException
 
-import Regex.Branch
-import Regex.Git
-import Regex.Local
-import Regex.Param
-import Regex.Repo
+import Regexes.Branch
+import Regexes.Git
+import Regexes.Local
+import Regexes.Param
+import Regexes.Repo
 
 class Giter8 {
 
@@ -48,21 +48,29 @@ class Giter8 {
       val templateInfo = Template.fetchInfo(template, Some("src/main/g8"), Some("src/main/scaffolds"))
       val TemplateInfo(defaultProperties, templates, templatesRoot, scaffoldsRoot) = templateInfo
       
-      val parameters = G8Helpers.getParameters(arguments, defaultProperties)
+      val properties = Properties.determineProperties(arguments, defaultProperties, UserUnchangedPropertyHandler)
 
-      val outputRoot = G8Helpers.getOutputRoot(parameters, outputFolder = new File("."))
+      val outputRoot = getOutputRoot(properties, outputFolder = new File("."))
 
+      val result = Template.processTemplates(templatesRoot, templates, properties, outputRoot, Some(UserExistingFileActionProvider))
 
-      val result = G8Helpers.processTemplates(templatesRoot, templates, parameters, outputRoot, None)
-      // just here during refactoring, making sure we do not remove this method for a lack of usage
-      val result2 = G8Helpers.processTemplates(templatesRoot, templates, parameters, outputRoot, Some(UserExistingFileActionProvider))
-
-      if (result.isSuccess) G8Helpers.copyScaffolds(scaffoldsRoot, outputRoot)
+      if (result.isSuccess) Scaffolds.copy(scaffoldsRoot, outputRoot)
 
       result
     }
   }
 
+  def getOutputRoot(parameters: Map[String, String], outputFolder: File): File = {
+
+    val outputPath = parameters
+      .get(KnownPropertyNames.NAME)
+      .map(StringHelpers.normalize)
+      .getOrElse(".")
+
+    new File(outputFolder, outputPath)
+  }
+  
+  
   def performTasks(user: String, project: String, branch: Option[String], params: Seq[String]): Try[String] =
 
     performTasks(s"git://github.com/$user/$project.g8.git", branch, params)
