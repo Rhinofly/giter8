@@ -1,19 +1,17 @@
 package giter8
 
 import java.io.File
-
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
-
 import org.apache.commons.io.FileUtils
 import org.eclipse.jgit.api.errors.JGitInternalException
-
 import Regexes.Branch
 import Regexes.Git
 import Regexes.Local
 import Regexes.Param
 import Regexes.Repo
+import giter8.git.GitUtilities
 
 class Giter8 {
 
@@ -42,7 +40,7 @@ class Giter8 {
 
   def performTasks(repo: String, branch: Option[String], arguments: Seq[String]): Try[String] = {
 
-    val template = GitHelper.clone(repo, branch, tempDirectory)
+    val template = GitUtilities.clone(repo, branch, tempDirectory)
 
     template.flatMap { template =>
       val templateInfo = Template.fetchInfo(template, Some("src/main/g8"), Some("src/main/scaffolds"))

@@ -1,13 +1,12 @@
-package giter8
+package giter8.git
 
 import org.eclipse.jgit.api.Git
 import java.io.File
 import scala.collection.JavaConverters._
-import scala.util.Success
-import scala.util.Failure
 import scala.util.Try
 
-object GitHelper {
+object GitUtilities {
+  
   def clone(repo: String, branch: Option[String], directory: File):Try[File] = Try {
 
     val fullBranchName = branch.map("refs/heads/" + _)
@@ -25,7 +24,7 @@ object GitHelper {
     }
   }
 
-  def containsBranch(git: Git)(branch: String) = {
+  private def containsBranch(git: Git)(branch: String) = {
     val branchList = git.branchList.call().asScala
     val branchNames = branchList map (_.getName)
     branchNames contains branch

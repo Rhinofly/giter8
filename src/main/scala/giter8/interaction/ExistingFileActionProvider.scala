@@ -1,6 +1,6 @@
-package giter8
-
-import java.io.File
+package giter8.interaction
+import giter8.files.Action
+import giter8.files.FileInformation
 
 trait ExistingFileActionProvider {
 

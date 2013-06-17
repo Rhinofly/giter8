@@ -1,16 +1,18 @@
-package giter8
+package giter8.files
 
 import java.io.File
+import giter8.KnownPropertyNames
+import giter8.StringRenderer
 
 class PathExpander(parameters: Map[String, String]) {
 
   def expand(relative: String, toPath: File): File =
-    new File(toPath, StringRenderer.render(formatize(relative), normalizePackage(parameters)))
+    new File(toPath, StringRenderer.render(formatize(relative), normalizedPackage))
 
   private def formatize(s: String) =
     s.replaceAll("""\$(\w+)__(\w+)\$""", """\$$1;format="$2"\$""")
 
-  private def normalizePackage(parameters: Map[String, String]) =
+  private lazy val normalizedPackage =
     (parameters get KnownPropertyNames.PACKAGE)
       .map(packageToDirectory)
       .map(updatePackageValueInMap(parameters))

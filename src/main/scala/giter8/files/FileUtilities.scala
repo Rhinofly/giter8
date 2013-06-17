@@ -1,9 +1,13 @@
-package giter8
+package giter8.files
 
 import java.io.File
-import org.clapper.scalasti.StringTemplate
+import scala.collection.immutable.Stream.consWrapper
 
-object FileHelper {
+object FileUtilities {
+
+  def getAllFilesRecursively = getFilesRecursively(_ => true) _
+  def getVisibleFilesRecursively = getFilesRecursively(!_.isHidden) _
+  
   private def getFilesRecursively(filter: File => Boolean)(f: File): Stream[File] =
     f #:: getChildFiles(f, filter)
 
@@ -14,11 +18,8 @@ object FileHelper {
         .filter(filter)
         .flatMap(getFilesRecursively(filter))
     } else Stream.empty
-
-  def getAllFilesRecursively = getFilesRecursively(_ => true) _
-  def getVisibleFilesRecursively = getFilesRecursively(!_.isHidden) _
   
-  def relativize(in: File, from: File) = 
-    (from.toURI relativize in.toURI).getPath
+  def getRelativePath(file: File, base: File) = 
+    (base.toURI relativize file.toURI).getPath
   
 }

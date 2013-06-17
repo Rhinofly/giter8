@@ -5,13 +5,21 @@ import java.io.FileInputStream
 import scala.collection.JavaConversions.enumerationAsScalaIterator
 import java.util.{Properties => JavaProperties}
 import scala.util.Try
+import giter8.files.Render
+import giter8.files.Ignore
+import giter8.files.Copy
+import giter8.files.Action
+import giter8.interaction.ExistingFileActionProvider
+import giter8.files.FileUtilities
+import giter8.files.FileInformation
+import giter8.files.PathExpander
 
 object Template {
 
   def fetchInfo(base: File, templatePath: Option[String], scaffoldsPath: Option[String]): TemplateInfo = {
 
     val templatesRoot = templatePath.map(new File(base, _)).getOrElse(base)
-    val files = FileHelper.getAllFilesRecursively(templatesRoot)
+    val files = FileUtilities.getAllFilesRecursively(templatesRoot)
     val propertiesFile = new File(templatesRoot, "default.properties")
 
     val defaultProperties = readProperties(propertiesFile)
@@ -74,7 +82,7 @@ object Template {
   }
 
   private def toInputAndOutput(pathExpander: PathExpander, templatesRoot: File, outputRoot: File)(template: File): (File, File) = {
-    val name = FileHelper.relativize(template, templatesRoot)
+    val name = FileUtilities.getRelativePath(template, templatesRoot)
     val out = pathExpander.expand(name, outputRoot)
     template -> out
   }

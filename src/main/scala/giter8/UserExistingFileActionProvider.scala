@@ -1,5 +1,13 @@
 package giter8
 
+import giter8.files.RenderAndAppend
+import giter8.files.Render
+import giter8.files.Ignore
+import giter8.files.Copy
+import giter8.files.Action
+import giter8.interaction.ExistingFileActionProvider
+import giter8.files.FileInformation
+
 object UserExistingFileActionProvider extends ExistingFileActionProvider {
 
   def determineAction(fileInformation: FileInformation, parameters: Map[String, String]): Action = {
