@@ -29,22 +29,7 @@ class Giter8 {
 
     val (params, repositoryPattern) = partitionParams(args)
 
-    val result =
-      repositoryPattern match {
-        case Array(Local(repo)) =>
-          performTasks(repo, None, params)
-        case Array(Local(repo), Branch(_), branch) =>
-          performTasks(repo, Some(branch), params)
-        case Array(Repo(user, proj)) =>
-          performTasks(user, proj, None, params)
-        case Array(Repo(user, proj), Branch(_), branch) =>
-          performTasks(user, proj, Some(branch), params)
-        case Array(Git(remote)) =>
-          performTasks(remote, None, params)
-        case Array(Git(remote), Branch(_), branch) =>
-          performTasks(remote, Some(branch), params)
-        case _ => Failure(new Exception(usage))
-      }
+    val result = performTasks(params, repositoryPattern)
 
     removeTempDirectory()
 
@@ -59,27 +44,23 @@ class Giter8 {
 
     val template = GitHelper.clone(repo, branch, tempDirectory)
 
-    val result =
-      template.map { template =>
-        val templateInfo = Template.fetchInfo(template, Some("src/main/g8"), Some("src/main/scaffolds"))
-        val parameters = G8Helpers.getParameters(arguments, templateInfo.defaultProperties)
+    template.flatMap { template =>
+      val templateInfo = Template.fetchInfo(template, Some("src/main/g8"), Some("src/main/scaffolds"))
+      val TemplateInfo(defaultProperties, templates, templatesRoot, scaffoldsRoot) = templateInfo
+      
+      val parameters = G8Helpers.getParameters(arguments, defaultProperties)
 
-        val outputRoot = G8Helpers.getOutputRoot(parameters, outputFolder = new File("."))
+      val outputRoot = G8Helpers.getOutputRoot(parameters, outputFolder = new File("."))
 
-        val TemplateInfo(_, templates, templatesRoot, scaffoldsRoot) = templateInfo
 
-        val result = G8Helpers.write(templatesRoot, templates, parameters, outputRoot)
-        // just here during refactoring, making sure we do not remove this method for a lack of usage
-        val result2 = G8Helpers.writeInterative(templatesRoot, templates, parameters, outputRoot)
+      val result = G8Helpers.processTemplates(templatesRoot, templates, parameters, outputRoot, None)
+      // just here during refactoring, making sure we do not remove this method for a lack of usage
+      val result2 = G8Helpers.processTemplates(templatesRoot, templates, parameters, outputRoot, Some(UserExistingFileActionProvider))
 
-        if (result.isRight) G8Helpers.copyScaffolds(scaffoldsRoot, outputRoot)
+      if (result.isSuccess) G8Helpers.copyScaffolds(scaffoldsRoot, outputRoot)
 
-        val Right(appliedTemplate) = result
-
-        appliedTemplate
-      }
-
-    result
+      result
+    }
   }
 
   def performTasks(user: String, project: String, branch: Option[String], params: Seq[String]): Try[String] =
@@ -129,6 +110,23 @@ class Giter8 {
                 |    g8 n8han/giter8 --name=template-test
                 |
                 |""".stripMargin format (BuildInfo.version)
+
+  private def performTasks(params: Array[String], repositoryPattern: Array[String]): Try[String] =
+    repositoryPattern match {
+      case Array(Local(repo)) =>
+        performTasks(repo, None, params)
+      case Array(Local(repo), Branch(_), branch) =>
+        performTasks(repo, Some(branch), params)
+      case Array(Repo(user, proj)) =>
+        performTasks(user, proj, None, params)
+      case Array(Repo(user, proj), Branch(_), branch) =>
+        performTasks(user, proj, Some(branch), params)
+      case Array(Git(remote)) =>
+        performTasks(remote, None, params)
+      case Array(Git(remote), Branch(_), branch) =>
+        performTasks(remote, Some(branch), params)
+      case _ => Failure(new Exception(usage))
+    }
 
 }
 

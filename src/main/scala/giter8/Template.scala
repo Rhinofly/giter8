@@ -24,7 +24,7 @@ object Template {
     TemplateInfo(defaultProperties, templates, templatesRoot, scaffoldsRoot)
   }
 
-  def readProperties(propertiesFile: File): Map[String, String] =
+  private def readProperties(propertiesFile: File): Map[String, String] =
     if (propertiesFile.exists) {
 
       val loadProperties = (fileToProperties _) andThen (propertiesToMap _)
@@ -32,7 +32,7 @@ object Template {
       
     } else Map.empty
 
-  def fileToProperties(propertiesFile: File) = {
+  private def fileToProperties(propertiesFile: File) = {
     val properties = new Properties
     val fileInputStream = new FileInputStream(propertiesFile)
     properties.load(fileInputStream)
@@ -40,7 +40,7 @@ object Template {
     properties
   }
 
-  def propertiesToMap(properties: Properties) =
+  private def propertiesToMap(properties: Properties) =
     (Map.empty[String, String] /: properties.propertyNames) { (m, k) =>
       m + (k.toString -> properties.getProperty(k.toString))
     }

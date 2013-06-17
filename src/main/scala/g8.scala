@@ -2,16 +2,14 @@ package giter8
 
 import java.io.File
 import java.nio.charset.MalformedInputException
-
 import scala.Array.canBuildFrom
 import scala.util.control.Exception.allCatch
 import scala.util.control.Exception.catching
-
 import org.apache.commons.io.Charsets.UTF_8
 import org.apache.commons.io.FileUtils
 import org.clapper.scalasti.StringTemplate
-
 import Regex.Param
+import scala.util.Try
 
 object G8 {
   import scala.util.control.Exception.allCatch
@@ -131,39 +129,27 @@ object G8Helpers {
     result.replacedProperties ++ interact(result.unchangedProperties)
   }
 
+  def getAndRemove(map: Map[String, String], key: String): (Option[String], Map[String, String]) =
+    (map get key, map - key)
+
+  val DESCRIPTION = "description"
+  val VERBATIM = "verbatim"
+    
   def interact(params: Map[String, String]) = {
-    val (desc, others) = params partition { case (k, _) => k == "description" }
+    val description = params get DESCRIPTION
+    val others = params - DESCRIPTION - VERBATIM
 
-    desc.values.foreach { d =>
-      @scala.annotation.tailrec
-      def liner(cursor: Int, rem: Iterable[String]) {
-        if (!rem.isEmpty) {
-          val next = cursor + 1 + rem.head.length
-          if (next > 70) {
-            println()
-            liner(0, rem)
-          } else {
-            print(rem.head + " ")
-            liner(next, rem.tail)
-          }
-        }
-      }
-      println()
-      liner(0, d.split(" "))
-      println("\n")
-    }
+    description foreach printDescription
 
-    val fixed = Set("verbatim")
-    others map {
-      case (k, v) =>
-        if (fixed.contains(k))
-          (k, v)
-        else {
-          val in = Console.readLine("%s [%s]: ", k, v).trim
-          (k, if (in.isEmpty) v else in)
-        }
-    }
+    requestParametersFromUser(others)
   }
+  
+  def requestParametersFromUser(params:Map[String, String]) = 
+   params map {
+      case (k, v) =>
+        val in = Console.readLine("%s [%s]: ", k, v).trim
+        (k, if (in.isEmpty) v else in)
+    }
 
   private def relativize(in: File, from: File) = from.toURI().relativize(in.toURI).getPath
 
@@ -176,113 +162,53 @@ object G8Helpers {
     template -> out
   }
 
-  def write(templatesRoot: File,
-    templates: Iterable[File],
-    parameters: Map[String, String],
-    outputRoot: File) = {
+  def determineAction(in: File, out: File, parameters: Map[String, String], actionProvider: Option[ExistingFileActionProvider]) = {
 
-    val renderer = new StringRenderer
+    val fileInformation = FileInformation.get(in, out, parameters)
+    val textContent = fileInformation.textContent
+
+    val action: Action =
+      if (out.exists)
+        actionProvider
+          .map(_.determineAction(fileInformation, parameters))
+          .getOrElse(Ignore(out))
+      else if (textContent.isDefined && !fileInformation.isVerbatim)
+        Render(out, textContent.get, parameters)
+      else
+        Copy(in, out)
+
+    action
+  }
+
+  def processTemplates(templatesRoot: File, 
+    templates: Iterable[File], 
+    parameters: Map[String, String], 
+    outputRoot: File, 
+    existingFileActionProvider: Option[ExistingFileActionProvider]) = Try {
 
     templates
       .map(toInputAndOutput(parameters, templatesRoot, outputRoot))
       .foreach {
         case (in, out) =>
 
-          val text = readUtf8File(in)
-          val verbatim = G8.verbatim(out, parameters)
-
-          val action =
-            if (out.exists) Skip
-            else NoAction
+          val action = determineAction(in, out, parameters, existingFileActionProvider)
 
           out.getParentFile.mkdirs()
 
-          (action, text, verbatim) match {
-            case (Skip, _, _) =>
-              println("Skipping existing file: %s" format out.toString)
-            case (_, Some(text), false) =>
-              G8.write(out, text, parameters, append = false)
-            case (_, _, _) =>
-              FileUtils.copyFile(in, out)
-          }
+          action.execute()
 
-          if (action != Skip && in.canExecute) {
+          if (!action.isInstanceOf[Ignore] && in.canExecute) {
             out.setExecutable(true)
           }
       }
 
-    Right("Template applied in %s" format (outputRoot.toString))
+    s"Template applied in $outputRoot"
   }
 
   def readUtf8File(file: File) =
     catching(classOf[MalformedInputException]).opt {
       FileUtils.readFileToString(file, UTF_8)
     }
-
-  sealed trait Action
-  case object Append extends Action
-  case object Override extends Action
-  case object Skip extends Action
-  case object NoAction extends Action
-
-  private def getAction(fileName: String, isText: Boolean, verbatim: Boolean) = {
-    val utf8 = "UTF8 text"
-    val fileType = if (isText) utf8 else s"non-$utf8"
-    val markedAsVerbatim = if (verbatim) " and is marked as verbatim" else ""
-    println(s"$fileName already exists ($fileType)$markedAsVerbatim")
-
-    val allowAppend = isText && !verbatim
-
-    val append = if (allowAppend) " append," else ""
-    val appendOption = if (allowAppend) "/a" else ""
-    print(s"do you want to$append override or skip existing file? [O$appendOption/s] ")
-
-    Console.readLine match {
-      case "a" if allowAppend => Append
-      case "o" | "" => Override
-      case _ => Skip
-    }
-  }
-
-  def writeInterative(templatesRoot: File,
-    templates: Iterable[File],
-    parameters: Map[String, String],
-    outputRoot: File) = {
-
-    val renderer = new StringRenderer
-
-    templates
-      .map(toInputAndOutput(parameters, templatesRoot, outputRoot))
-      .foreach {
-        case (in, out) =>
-          val text = readUtf8File(in)
-          val verbatim = G8.verbatim(out, parameters)
-
-          val action =
-            if (out.exists) {
-              getAction(out.getCanonicalPath, text.isDefined, verbatim)
-            } else NoAction
-
-          out.getParentFile.mkdirs()
-
-          (action, text, verbatim) match {
-            case (Skip, _, _) =>
-              println("Skipping existing file: %s" format out.toString)
-            case (Append, Some(text), _) =>
-              G8.write(out, text, parameters, append = true)
-            case (_, Some(text), false) =>
-              G8.write(out, text, parameters, append = false)
-            case (_, _, _) =>
-              FileUtils.copyFile(in, out)
-          }
-
-          if (action != Skip && in.canExecute) {
-            out.setExecutable(true)
-          }
-      }
-
-    Right("Template applied in %s" format (outputRoot.toString))
-  }
 
   def copyScaffolds(sf: File, output: File) {
 
@@ -311,6 +237,25 @@ object G8Helpers {
     for (
       root <- scaffoldsRoot
     ) copyScaffolds(root, outputRoot)
+  }
+
+  private def printDescription(description: String): Unit = {
+    @scala.annotation.tailrec
+    def printWords(cursor: Int, words: Iterable[String]) {
+      if (!words.isEmpty) {
+        val nextPosition = cursor + 1 + words.head.length
+        if (nextPosition > 70) {
+          println()
+          printWords(0, words)
+        } else {
+          print(words.head + " ")
+          printWords(nextPosition, words.tail)
+        }
+      }
+    }
+    println()
+    printWords(0, description.split(" "))
+    println("\n")
   }
 }
 
