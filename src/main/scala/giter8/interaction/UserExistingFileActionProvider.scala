@@ -1,4 +1,4 @@
-package giter8
+package giter8.interaction
 
 import giter8.files.RenderAndAppend
 import giter8.files.Render
@@ -7,6 +7,10 @@ import giter8.files.Copy
 import giter8.files.Action
 import giter8.interaction.ExistingFileActionProvider
 import giter8.files.FileInformation
+import giter8.interaction.Append
+import giter8.interaction.Override
+import giter8.interaction.Skip
+import giter8.interaction.UserResponse
 
 object UserExistingFileActionProvider extends ExistingFileActionProvider {
 

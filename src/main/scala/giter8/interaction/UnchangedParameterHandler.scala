@@ -1,4 +1,4 @@
-package giter8
+package giter8.interaction
 
 trait UnchangedParameterHandler {
   

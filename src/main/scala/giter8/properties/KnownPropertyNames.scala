@@ -1,4 +1,4 @@
-package giter8
+package giter8.properties
 
 object KnownPropertyNames {
   val DESCRIPTION = "description"

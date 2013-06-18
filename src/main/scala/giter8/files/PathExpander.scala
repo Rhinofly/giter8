@@ -1,8 +1,8 @@
 package giter8.files
 
 import java.io.File
-import giter8.KnownPropertyNames
 import giter8.StringRenderer
+import giter8.properties.KnownPropertyNames
 
 class PathExpander(parameters: Map[String, String]) {
 

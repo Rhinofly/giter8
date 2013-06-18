@@ -1,4 +1,4 @@
-package giter8
+package giter8.interaction
 
 sealed trait UserResponse
 case object Append extends UserResponse

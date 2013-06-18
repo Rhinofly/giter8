@@ -1,4 +1,6 @@
-package giter8
+package giter8.interaction
+
+import giter8.interaction.UnchangedParameterHandler
 
 object UserUnchangedPropertyHandler extends UnchangedParameterHandler {
 

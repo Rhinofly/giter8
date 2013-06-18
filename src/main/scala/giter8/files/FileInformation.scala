@@ -1,14 +1,16 @@
 package giter8.files
 
 import java.io.File
-import scala.util.control.Exception.catching
 import java.nio.charset.MalformedInputException
-import org.apache.commons.io.FileUtils
-import org.apache.commons.io.Charsets.UTF_8
-import scala.util.matching.Regex
-import giter8.KnownPropertyNames
-import java.nio.charset.MalformedInputException
+
 import scala.Array.canBuildFrom
+import scala.util.control.Exception.catching
+import scala.util.matching.Regex
+
+import org.apache.commons.io.Charsets.UTF_8
+import org.apache.commons.io.FileUtils
+
+import giter8.properties.KnownPropertyNames
 
 case class FileInformation(
     input: File, 

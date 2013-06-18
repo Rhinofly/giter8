@@ -5,31 +5,26 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 import org.apache.commons.io.FileUtils
-import org.eclipse.jgit.api.errors.JGitInternalException
-import Regexes.Branch
-import Regexes.Git
-import Regexes.Local
 import Regexes.Param
-import Regexes.Repo
 import giter8.git.GitUtilities
+import giter8.git.Repository
+import giter8.interaction.Interaction
+import giter8.interaction.UserExistingFileActionProvider
+import giter8.interaction.UserUnchangedPropertyHandler
 
 class Giter8 {
 
-  private val tempDirectory =
-    new File(FileUtils.getTempDirectory, "giter8-" + System.nanoTime)
+  def run(arguments: Array[String]): Int = {
 
-  def partitionParams(args: Array[String]) =
-    args.partition { s =>
-      Param.pattern.matcher(s).matches
-    }
+    val (parameters, repository) = splitParametersAndRepository(arguments)
 
-  def run(args: Array[String]): Int = {
+    val outputFolder = new File(".")
+    val interaction = Interaction(UserUnchangedPropertyHandler, UserExistingFileActionProvider)
 
-    val (params, repositoryPattern) = partitionParams(args)
-
-    val result = performTasks(params, repositoryPattern)
-
-    removeTempDirectory()
+    val result =
+      repository map { repository =>
+        run(repository, parameters, outputFolder, interaction)
+      } getOrElse Failure(new Exception(usage))
 
     result match {
       case Success(message) =>
@@ -38,58 +33,47 @@ class Giter8 {
     }
   }
 
-  def performTasks(repo: String, branch: Option[String], arguments: Seq[String]): Try[String] = {
+  private def splitParametersAndRepository(args: Array[String]): (Array[String], Option[Repository]) = {
 
-    val template = GitUtilities.clone(repo, branch, tempDirectory)
-
-    template.flatMap { template =>
-      val templateInfo = Template.fetchInfo(template, Some("src/main/g8"), Some("src/main/scaffolds"))
-      val TemplateInfo(defaultProperties, templates, templatesRoot, scaffoldsRoot) = templateInfo
-      
-      val properties = Properties.determineProperties(arguments, defaultProperties, UserUnchangedPropertyHandler)
-
-      val outputRoot = getOutputRoot(properties, outputFolder = new File("."))
-
-      val result = Template.processTemplates(templatesRoot, templates, properties, outputRoot, Some(UserExistingFileActionProvider))
-
-      if (result.isSuccess) Scaffolds.copy(scaffoldsRoot, outputRoot)
-
-      result
+    val (parameters, repositoryPattern) = args.partition { s =>
+      Param.pattern.matcher(s).matches
     }
+    parameters -> Repository.get(repositoryPattern)
   }
 
-  def getOutputRoot(parameters: Map[String, String], outputFolder: File): File = {
-
-    val outputPath = parameters
-      .get(KnownPropertyNames.NAME)
-      .map(StringHelpers.normalize)
-      .getOrElse(".")
-
-    new File(outputFolder, outputPath)
+  def run(repository: Repository, parameters: Seq[String], outputFolder: File, interaction: Interaction): Try[String] = {
+    run(repository, parametersToProperties(parameters), outputFolder, interaction)
   }
-  
-  
-  def performTasks(user: String, project: String, branch: Option[String], params: Seq[String]): Try[String] =
 
-    performTasks(s"git://github.com/$user/$project.g8.git", branch, params)
-      .recoverWith {
-        // assume it was an access failure, try with ssh
-        case _: JGitInternalException =>
-          // after cleaning the clone directory
-          removeTempDirectory()
-          performTasks(s"git@github.com:$user/$project.g8.git", branch, params)
-      }
+  private def parametersToProperties(parameters: Seq[String]): Map[String, String] =
+    parameters.map {
+      case Param(key, value) => key -> value
+    }.toMap
 
-  def removeTempDirectory() =
+  def run(repository: Repository, parameterProperties: Map[String, String], outputFolder: File, interaction: Interaction): Try[String] = {
+
+    val tempDirectory =
+      new File(FileUtils.getTempDirectory, "giter8-" + System.nanoTime)
+
+    val clone = GitUtilities.clone(repository, tempDirectory)
+
+    val result = clone.flatMap { clone =>
+      new Template(clone, parameterProperties, interaction)
+        .process(outputFolder)
+    }
+
     if (tempDirectory.exists) FileUtils forceDelete tempDirectory
 
-  def printError(error: Throwable) =
+    result
+  }
+
+  private def printError(error: Throwable) =
     System.err.println("\n%s\n" format error.getMessage)
 
-  def printMessage(message: String) =
+  private def printMessage(message: String) =
     println("\n%s\n" format message)
 
-  def usage = """giter8 %s
+  private def usage = """giter8 %s
                 |Usage: g8 [TEMPLATE] [OPTION]...
                 |Apply specified template.
                 |
@@ -117,33 +101,10 @@ class Giter8 {
                 |
                 |""".stripMargin format (BuildInfo.version)
 
-  private def performTasks(params: Array[String], repositoryPattern: Array[String]): Try[String] =
-    repositoryPattern match {
-      case Array(Local(repo)) =>
-        performTasks(repo, None, params)
-      case Array(Local(repo), Branch(_), branch) =>
-        performTasks(repo, Some(branch), params)
-      case Array(Repo(user, proj)) =>
-        performTasks(user, proj, None, params)
-      case Array(Repo(user, proj), Branch(_), branch) =>
-        performTasks(user, proj, Some(branch), params)
-      case Array(Git(remote)) =>
-        performTasks(remote, None, params)
-      case Array(Git(remote), Branch(_), branch) =>
-        performTasks(remote, Some(branch), params)
-      case _ => Failure(new Exception(usage))
-    }
-
 }
 
 object Giter8 extends Giter8 {
 
-  val home =
-    Option(System getProperty "G8_HOME")
-      .map(new File(_))
-      .getOrElse(new File(System getProperty "user.home", ".g8"))
-
-  /** Main-class runner just for testing from sbt*/
   def main(args: Array[String]) {
     System.exit(run(args))
   }

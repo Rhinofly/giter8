@@ -1,13 +1,13 @@
-package giter8
+package giter8.properties
 
-import Regexes.Param
+import giter8.Regexes.Param
+import giter8.interaction.UnchangedParameterHandler
 
 object Properties {
-  def determineProperties(arguments: Seq[String], defaultProperties: Map[String, String], unchangedPropertyHandler: UnchangedParameterHandler): Map[String, String] = {
+  def determineProperties(replacements: Map[String, String], defaultProperties: Map[String, String], unchangedPropertyHandler: Option[UnchangedParameterHandler]): Map[String, String] = {
 
     printDescription(defaultProperties)
 
-    val replacements = argumentsToProperties(arguments)
     val result = ReplacePropertyValues(defaultProperties, replacements)
 
     result.invalidProperties.keys.foreach { key =>
@@ -15,7 +15,7 @@ object Properties {
     }
 
     result.replacedProperties ++
-      unchangedPropertyHandler.handle(result.unchangedProperties)
+      unchangedPropertyHandler.map(_.handle(result.unchangedProperties)).getOrElse(result.unchangedProperties)
   }
 
   private def printDescription(params: Map[String, String]): Unit = {
@@ -41,11 +41,6 @@ object Properties {
     printWords(0, description.split(" "))
     println("\n")
   }
-
-  private def argumentsToProperties(arguments: Seq[String]): Map[String, String] =
-    arguments.map {
-      case Param(key, value) => key -> value
-    }.toMap
 
   private case class ReplacePropertyValues(baseProperties: Map[String, String], replacements: Map[String, String]) {
 
