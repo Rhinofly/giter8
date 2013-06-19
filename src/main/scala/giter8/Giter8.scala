@@ -1,19 +1,23 @@
 package giter8
 
 import java.io.File
+
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
+
 import org.apache.commons.io.FileUtils
-import Regexes.Param
+
 import giter8.git.GitUtilities
 import giter8.git.Repository
 import giter8.interaction.Interaction
-import giter8.interaction.UserExistingFileActionProvider
-import giter8.interaction.UserUnchangedPropertyHandler
+import giter8.interaction.user.UserExistingFileActionProvider
+import giter8.interaction.user.UserUnchangedPropertyHandler
 
 class Giter8 {
 
+  val Param = """^--(\S+)=(.+)$""".r
+  
   def run(arguments: Array[String]): Int = {
 
     val (parameters, repository) = splitParametersAndRepository(arguments)

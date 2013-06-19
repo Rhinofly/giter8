@@ -1,65 +1,75 @@
 package giter8.properties
 
-import giter8.Regexes.Param
+import java.io.File
+import java.io.FileInputStream
+import java.util.{Properties => JavaProperties}
+
+import scala.annotation.migration
+import scala.collection.JavaConverters.enumerationAsScalaIteratorConverter
+
 import giter8.interaction.UnchangedParameterHandler
 
-object Properties {
-  def determineProperties(replacements: Map[String, String], defaultProperties: Map[String, String], unchangedPropertyHandler: Option[UnchangedParameterHandler]): Map[String, String] = {
+case class Properties(
+  defaultProperties: Map[String, String],
+  propertyOverrides: Map[String, String],
+  unchangedPropertyHandler: Option[UnchangedParameterHandler]) {
 
-    printDescription(defaultProperties)
+  val description = defaultProperties get KnownPropertyNames.DESCRIPTION
 
-    val result = ReplacePropertyValues(defaultProperties, replacements)
+  val fixedProperties =
+    defaultProperties.filterKeys(KnownPropertyNames.fixed.contains)
 
-    result.invalidProperties.keys.foreach { key =>
+  val replacedProperties =
+    fixedProperties ++
+      propertyOverrides.filterKeys(defaultProperties.contains)
+
+  val invalidProperties =
+    propertyOverrides.filterNot {
+      case (key, _) => defaultProperties contains key
+    }
+
+  val unchangedProperties =
+    defaultProperties.filterNot {
+      case (key, _) =>
+        (propertyOverrides contains key) && (fixedProperties contains key)
+    }
+
+  lazy val transformedUnchangedProperties =
+    unchangedPropertyHandler.map(_.handle(unchangedProperties)).getOrElse(unchangedProperties)
+
+  lazy val all = {
+
+    invalidProperties.keys.foreach { key =>
       println(s"Ignoring unrecognized parameter: $key")
     }
 
-    result.replacedProperties ++
-      unchangedPropertyHandler.map(_.handle(result.unchangedProperties)).getOrElse(result.unchangedProperties)
+    replacedProperties ++ transformedUnchangedProperties
+  }
+}
+
+object Properties {
+
+  def apply(propertiesFile: File, propertyOverrides: Map[String, String], unchangedPropertyHandler: Option[UnchangedParameterHandler]):Properties =
+    Properties(readProperties(propertiesFile), propertyOverrides, unchangedPropertyHandler)
+
+  def readProperties(propertiesFile: File): Map[String, String] =
+    if (propertiesFile.exists) {
+
+      val loadProperties = (fileToProperties _) andThen (propertiesToMap _)
+      loadProperties(propertiesFile)
+
+    } else Map.empty
+
+  def fileToProperties(propertiesFile: File) = {
+    val properties = new JavaProperties
+    val fileInputStream = new FileInputStream(propertiesFile)
+    properties.load(fileInputStream)
+    fileInputStream.close()
+    properties
   }
 
-  private def printDescription(params: Map[String, String]): Unit = {
-    val description = params get KnownPropertyNames.DESCRIPTION
-    description foreach printDescription
-  }
-
-  private def printDescription(description: String): Unit = {
-    @scala.annotation.tailrec
-    def printWords(cursor: Int, words: Iterable[String]) {
-      if (!words.isEmpty) {
-        val nextPosition = cursor + 1 + words.head.length
-        if (nextPosition > 70) {
-          println()
-          printWords(0, words)
-        } else {
-          print(words.head + " ")
-          printWords(nextPosition, words.tail)
-        }
-      }
+  def propertiesToMap(properties: JavaProperties) =
+    (Map.empty[String, String] /: properties.propertyNames.asScala) { (m, k) =>
+      m + (k.toString -> properties.getProperty(k.toString))
     }
-    println()
-    printWords(0, description.split(" "))
-    println("\n")
-  }
-
-  private case class ReplacePropertyValues(baseProperties: Map[String, String], replacements: Map[String, String]) {
-
-    private val fixedProperties =
-      baseProperties.filterKeys(KnownPropertyNames.fixed.contains)
-
-    lazy val unchangedProperties =
-      baseProperties.filterNot {
-        case (key, _) =>
-          (replacements contains key) && (fixedProperties contains key)
-      }
-
-    lazy val replacedProperties =
-      fixedProperties ++
-        replacements.filterKeys(baseProperties.contains)
-
-    lazy val invalidProperties =
-      replacements.filterNot {
-        case (key, _) => baseProperties contains key
-      }
-  }
 }

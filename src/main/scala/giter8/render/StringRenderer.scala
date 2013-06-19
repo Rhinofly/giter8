@@ -1,8 +1,9 @@
-package giter8
+package giter8.render
 
+import scala.Array.canBuildFrom
 import org.clapper.scalasti.StringTemplate
 
-object StringRenderer extends org.clapper.scalasti.AttributeRenderer[String] {
+class StringRenderer extends org.clapper.scalasti.AttributeRenderer[String] {
   def toString(value: String): String = value
 
   override def toString(value: String, formatName: String): String = {
