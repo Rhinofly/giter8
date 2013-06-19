@@ -16,25 +16,25 @@ case class Properties(
 
   val description = defaultProperties get KnownPropertyNames.DESCRIPTION
 
-  val fixedProperties =
+  private val fixedProperties =
     defaultProperties.filterKeys(KnownPropertyNames.fixed.contains)
 
-  val replacedProperties =
+  private val replacedProperties =
     fixedProperties ++
       propertyOverrides.filterKeys(defaultProperties.contains)
 
-  val invalidProperties =
+  private val invalidProperties =
     propertyOverrides.filterNot {
       case (key, _) => defaultProperties contains key
     }
 
-  val unchangedProperties =
+  private val unchangedProperties =
     defaultProperties.filterNot {
       case (key, _) =>
         (propertyOverrides contains key) && (fixedProperties contains key)
     }
 
-  lazy val transformedUnchangedProperties =
+  private lazy val transformedUnchangedProperties =
     unchangedPropertyHandler.map(_.handle(unchangedProperties)).getOrElse(unchangedProperties)
 
   lazy val all = {
@@ -52,7 +52,7 @@ object Properties {
   def apply(propertiesFile: File, propertyOverrides: Map[String, String], unchangedPropertyHandler: Option[UnchangedParameterHandler]):Properties =
     Properties(readProperties(propertiesFile), propertyOverrides, unchangedPropertyHandler)
 
-  def readProperties(propertiesFile: File): Map[String, String] =
+  private def readProperties(propertiesFile: File): Map[String, String] =
     if (propertiesFile.exists) {
 
       val loadProperties = (fileToProperties _) andThen (propertiesToMap _)
@@ -60,7 +60,7 @@ object Properties {
 
     } else Map.empty
 
-  def fileToProperties(propertiesFile: File) = {
+  private def fileToProperties(propertiesFile: File) = {
     val properties = new JavaProperties
     val fileInputStream = new FileInputStream(propertiesFile)
     properties.load(fileInputStream)
@@ -68,7 +68,7 @@ object Properties {
     properties
   }
 
-  def propertiesToMap(properties: JavaProperties) =
+  private def propertiesToMap(properties: JavaProperties) =
     (Map.empty[String, String] /: properties.propertyNames.asScala) { (m, k) =>
       m + (k.toString -> properties.getProperty(k.toString))
     }

@@ -10,7 +10,7 @@ object UserExistingFileActionProvider extends ExistingFileActionProvider {
   def determineAction(fileInformation: FileInformation): Action = {
 
     val isVerbatim = fileInformation.isVerbatim
-    val isText = fileInformation.isText
+    val isText = fileInformation.text.isDefined
     val fileName = fileInformation.target.getCanonicalPath
     
     val userResponse = requestActionFromUser(isVerbatim, isText, fileName)

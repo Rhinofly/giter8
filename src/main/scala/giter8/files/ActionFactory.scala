@@ -1,10 +1,7 @@
 package giter8.files
 
-import giter8.files.Ignore
 import java.io.File
-import giter8.files.RenderAndAppend
-import giter8.files.Render
-import giter8.files.Copy
+
 import giter8.render.StringRenderer
 
 class ActionFactory(

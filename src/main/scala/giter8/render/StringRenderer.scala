@@ -17,7 +17,7 @@ class StringRenderer extends org.clapper.scalasti.AttributeRenderer[String] {
       .registerRenderer(this)
       .toString
   
-  def format(value: String, formatName: String): String =
+  private def format(value: String, formatName: String): String =
     formatName match {
       case "upper" | "uppercase" => value.toUpperCase
       case "lower" | "lowercase" => value.toLowerCase
@@ -35,14 +35,14 @@ class StringRenderer extends org.clapper.scalasti.AttributeRenderer[String] {
       case _ => value
     }
 
-  def decapitalize(s: String) = if (s.isEmpty) s else s(0).toLower + s.substring(1)
-  def startCase(s: String) = s.toLowerCase.split(" ").map(_.capitalize).mkString(" ")
-  def wordOnly(s: String) = s.replaceAll("""\W""", "")
-  def upperCamel(s: String) = wordOnly(startCase(s))
-  def lowerCamel(s: String) = decapitalize(upperCamel(s))
+  private def decapitalize(s: String) = if (s.isEmpty) s else s(0).toLower + s.substring(1)
+  private def startCase(s: String) = s.toLowerCase.split(" ").map(_.capitalize).mkString(" ")
+  private def wordOnly(s: String) = s.replaceAll("""\W""", "")
+  private def upperCamel(s: String) = wordOnly(startCase(s))
+  private def lowerCamel(s: String) = decapitalize(upperCamel(s))
 
-  def snakeCase(s: String) = s.replaceAll("""\s+""", "_")
-  def packageDir(s: String) = s.replace(".", System.getProperty("file.separator"))
-  def addRandomId(s: String) = s + "-" + new java.math.BigInteger(256, new java.security.SecureRandom).toString(32)
+  private def snakeCase(s: String) = s.replaceAll("""\s+""", "_")
+  private def packageDir(s: String) = s.replace(".", System.getProperty("file.separator"))
+  private def addRandomId(s: String) = s + "-" + new java.math.BigInteger(256, new java.security.SecureRandom).toString(32)
 
 }

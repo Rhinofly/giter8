@@ -1,8 +1,11 @@
 package giter8
 
 import java.io.File
+
 import scala.util.Try
+
 import org.apache.commons.io.FileUtils
+
 import giter8.files.Action
 import giter8.files.Copy
 import giter8.files.FileInformation
@@ -13,8 +16,8 @@ import giter8.files.Render
 import giter8.interaction.Interaction
 import giter8.properties.KnownPropertyNames
 import giter8.properties.Properties
-import giter8.render.StringRenderer
 import giter8.render.StringHelpers
+import giter8.render.StringRenderer
 
 class Template(
   directory: File,
@@ -23,18 +26,18 @@ class Template(
   rootPath: Option[String] = Some("src/main/g8"),
   scaffoldsPath: Option[String] = Some("src/main/scaffolds")) {
 
-  val root = rootPath.map(new File(directory, _)).getOrElse(directory)
-  val files = FileUtilities getAllFilesRecursively root
-  val templates =
+  private val root = rootPath.map(new File(directory, _)).getOrElse(directory)
+  private val files = FileUtilities getAllFilesRecursively root
+  private val templates =
     files.filter { file =>
       file != propertiesFile && !file.isDirectory
     }
-  val propertiesFile = new File(root, "default.properties")
-  val properties = Properties(propertiesFile, propertyOverrides, interaction.unchangedParameterHandler)
-  val scaffoldsRoot = scaffoldsPath.map(new File(directory, _))
+  private val propertiesFile = new File(root, "default.properties")
+  private val properties = Properties(propertiesFile, propertyOverrides, interaction.unchangedParameterHandler)
+  private val scaffoldsRoot = scaffoldsPath.map(new File(directory, _))
 
-  val renderer = new StringRenderer
-  val pathExpander = new PathExpander(properties.all, renderer)
+  protected val renderer = new StringRenderer
+  private val pathExpander = new PathExpander(properties.all, renderer)
 
   def process(outputFolder: File) = Try {
 
@@ -48,7 +51,7 @@ class Template(
     s"Template applied in $outputRoot"
   }
 
-  def processTemplates(outputRoot: File) =
+  private def processTemplates(outputRoot: File) =
     templates
       .map(toFileInformation(outputRoot))
       .foreach { fileInformation =>
@@ -67,14 +70,14 @@ class Template(
         }
       }
 
-  def toFileInformation(outputRoot: File)(template: File) = {
+  private def toFileInformation(outputRoot: File)(template: File) = {
     val name = FileUtilities.getRelativePath(template, root)
     val out = pathExpander.expand(name, outputRoot)
 
     FileInformation(template, out, properties.all, renderer)
   }
 
-  def determineAction(fileInformation: FileInformation) = {
+  private def determineAction(fileInformation: FileInformation) = {
 
     val text = fileInformation.text
     val input = fileInformation.input
@@ -93,7 +96,7 @@ class Template(
     action
   }
 
-  def printDescription(description: String): Unit = {
+  private def printDescription(description: String): Unit = {
     @scala.annotation.tailrec
     def printWords(cursor: Int, words: Iterable[String]) {
       if (!words.isEmpty) {
@@ -112,7 +115,7 @@ class Template(
     println("\n")
   }
 
-  def getOutputRoot(outputFolder: File) = {
+  private def getOutputRoot(outputFolder: File) = {
     val outputPath = properties.all
       .get(KnownPropertyNames.NAME)
       .map(StringHelpers.normalize)
@@ -121,13 +124,13 @@ class Template(
     new File(outputFolder, outputPath)
   }
 
-  def copyScaffolds(outputRoot: File): Unit = {
+  private def copyScaffolds(outputRoot: File): Unit = {
     for (
       root <- scaffoldsRoot
     ) copyScaffolds(root, outputRoot)
   }
 
-  def copyScaffolds(root: File, outputRoot: File) {
+  private def copyScaffolds(root: File, outputRoot: File) {
 
     val scaffolds = if (root.exists) Some(FileUtilities.getAllFilesRecursively(root)) else None
 

@@ -4,10 +4,10 @@ case class Repository(repositories: Seq[String], branch: Option[String])
 
 object Repository {
 
-  val Repo = """^([^\s/]+)/([^\s/]+?)(?:\.g8)?$""".r
-  val Branch = """^-(b|-branch)$""".r
-  val Git = "^(git[@|://].*)$".r
-  val Local = """^file://(\S+)$""".r
+  private val Repo = """^([^\s/]+)/([^\s/]+?)(?:\.g8)?$""".r
+  private val Branch = """^-(b|-branch)$""".r
+  private val Git = "^(git[@|://].*)$".r
+  private val Local = """^file://(\S+)$""".r
 
   private def apply(repo: String): Repository =
     Repository(Seq(repo), None)
